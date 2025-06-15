@@ -53,12 +53,12 @@ func get_users(usernames: Array[String]) -> Array[YatcChannel]:
 	var http = HTTPRequest.new()
 	self.add_child(http)
 
-	var url = URL.new(URL_VALIDATE)
+	var url = URL.new(URL_GET_USERS)
 	url.query['login'] = usernames
 
 	http.request(url.href, [
-		'Authorization: Bearer %s' % Yatc.singleton.token,
-		'Client-Id: %s' % Yatc.singleton.client_id,
+		'Authorization: Bearer %s' % Yatc.token,
+		'Client-Id: %s' % Yatc.client_id,
 	])
 
 	var result = await http.request_completed
@@ -69,12 +69,16 @@ func get_users(usernames: Array[String]) -> Array[YatcChannel]:
 		200:
 			var json = JSON.parse_string(body)
 			http.queue_free()
-			return json['data'].map(func(user):
+			var value: Array[YatcChannel] = []
+			value.append_array(json['data'].map(func(user):
 				var channel = YatcChannel.new()
-				channel.id = user['user_id']
+				channel.id = user['id']
 				channel.username = user['login']
+				channel.display_name = user['display_name']
+				channel.profile_image_url = user['profile_image_url']
 				return channel
-				)
+				))
+			return value
 		400, 401:
 			var json = JSON.parse_string(body)
 			Logger.scope('Yatc').info(json['message'])
@@ -90,7 +94,7 @@ func get_custom_reward(only_manageable:= false) -> Array[YatcPointsCustomReward]
 	_has_needed_scope(['channel:read:redemptions', 'channel:manage:redemptions'])
 
 	var url = URL.new('https://api.twitch.tv/helix/channel_points/custom_rewards')
-	url.query['broadcaster_id'] = Yatc.singleton.user.id
+	url.query['broadcaster_id'] = Yatc.user.id
 	url.query['only_manageable_rewards'] = only_manageable
 
 	var result = await _request(url)
@@ -122,7 +126,7 @@ func patch_custom_reward(reward: YatcPointsCustomReward, fields_to_update: Array
 	_has_needed_scope(['channel:manage:redemptions'])
 
 	var url = URL.new('https://api.twitch.tv/helix/channel_points/custom_rewards')
-	url.query['broadcaster_id'] = Yatc.singleton.user.id
+	url.query['broadcaster_id'] = Yatc.user.id
 	url.query['id'] = reward.id
 
 	var body = {}
@@ -148,7 +152,7 @@ func create_custom_reward(reward: YatcPointsCustomReward) -> void:
 	_has_needed_scope(['channel:manage:redemptions'])
 
 	var url = URL.new('https://api.twitch.tv/helix/channel_points/custom_rewards')
-	url.query['broadcaster_id'] = Yatc.singleton.user.id
+	url.query['broadcaster_id'] = Yatc.user.id
 
 	var body = {}
 	var allowed_props = [
@@ -186,8 +190,8 @@ func send_chat_announce(message: String, color: String = '') -> Error:
 	_has_needed_scope(['moderator:manage:announcements'])
 
 	var url = URL.new('https://api.twitch.tv/helix/chat/announcements')
-	url.query['broadcaster_id'] = Yatc.singleton.user.id
-	url.query['moderator_id'] = Yatc.singleton.user.id
+	url.query['broadcaster_id'] = Yatc.user.id
+	url.query['moderator_id'] = Yatc.user.id
 
 	var request_body = {}
 	request_body['message'] = message
@@ -222,8 +226,8 @@ func send_chat_message(message: String, reply_parent_message_id: String = '') ->
 	var url = URL.new('https://api.twitch.tv/helix/chat/messages')
 
 	var request_body = {}
-	request_body['broadcaster_id'] = Yatc.singleton.user.id
-	request_body['sender_id'] = Yatc.singleton.user.id
+	request_body['broadcaster_id'] = Yatc.user.id
+	request_body['sender_id'] = Yatc.user.id
 	request_body['message'] = message
 	if reply_parent_message_id:
 		request_body['reply_parent_message_id'] = reply_parent_message_id
@@ -249,7 +253,7 @@ func get_ad_schedule() -> YatcAdSchedule:
 	_has_needed_scope(['channel:read:ads'])
 
 	var url = URL.new('https://api.twitch.tv/helix/channels/ads')
-	url.query['broadcaster_id'] = Yatc.singleton.user.id
+	url.query['broadcaster_id'] = Yatc.user.id
 
 	var result = await _request(url)
 
@@ -278,8 +282,8 @@ func _request(url: URL, request_body: String = '', method: HTTPClient.Method = -
 		method = HTTPClient.METHOD_POST if request_body else HTTPClient.METHOD_GET
 
 	http.request(url.href, [
-		'Authorization: Bearer %s' % Yatc.singleton.token,
-		'Client-Id: %s' % Yatc.singleton.client_id,
+		'Authorization: Bearer %s' % Yatc.token,
+		'Client-Id: %s' % Yatc.client_id,
 		'Content-Type: application/json',
 	], method, request_body)
 
@@ -299,6 +303,6 @@ func _request(url: URL, request_body: String = '', method: HTTPClient.Method = -
 
 
 func _has_needed_scope(required_scopes: Array[String]) -> void:
-	assert(Yatc.singleton.scope.any(func(scope):
+	assert(Yatc.scope.any(func(scope):
 		return required_scopes.has(scope)),
 		'Error: to call this function you need to have one of the following scopes authorized: ' + ', '.join(required_scopes))

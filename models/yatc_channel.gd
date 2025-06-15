@@ -5,7 +5,9 @@ signal updated
 
 @export_storage var id: int
 @export_storage var username: String
+@export_storage var display_name: String
 @export_storage var token: String
+@export_storage var profile_image_url: String
 
 @export_storage var created_at: float
 @export_storage var expires_in: int = -1
@@ -41,17 +43,29 @@ func is_valid() -> bool:
 
 func save() -> void:
 	assert(username, "Error: can't save channel without login")
-	ResourceSaver.save(self, get_resource_path(username))
+	var path = get_resource_path(username)
+	DirAccess.make_dir_recursive_absolute(path.get_base_dir())
+	ResourceSaver.save(self, path)
+
+
+func download_profile_image(context: Node) -> void:
+	Downloader.save_image(
+		context,
+		profile_image_url,
+		get_profile_image_path(username))
 
 
 static func load(_username: String) -> YatcChannel:
 	var path = get_resource_path(_username)
 	if not FileAccess.file_exists(path):
-		print("[]")
 		return YatcChannel.new()
 	return ResourceLoader.load(path)
 
 
+static func get_profile_image_path(_username: String) -> String:
+	# TODO: make this based on the scope
+	return '%s/pp-%s.png' % [Yatc.BASEPATH, _username]
+
 static func get_resource_path(_username: String) -> String:
 	# TODO: make this based on the scope
-	return "user://yatc-%s.tres" % _username
+	return "%s/channel-%s.tres" % [Yatc.BASEPATH, _username]

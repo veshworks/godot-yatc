@@ -24,6 +24,10 @@ func remove_callback(fn: Callable) -> void:
 	callbacks.erase(fn)
 
 
+func clear_callbacks() -> void:
+	callbacks.clear()
+
+
 func _on_timeout() -> void:
 	for fn: Callable in callbacks:
 		fn.call()

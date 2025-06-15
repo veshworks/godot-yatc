@@ -98,7 +98,7 @@ func send200(client: StreamPeer, data: String = ''):
 
 
 func get_login_page() -> String:
-	var path = Yatc.singleton.get_module_path().path_join('public/index.html')
+	var path = Yatc.get_module_path().path_join('public/index.html')
 	var file = FileAccess.open(path, FileAccess.READ)
 	var content = file.get_as_text()
 	file.close()

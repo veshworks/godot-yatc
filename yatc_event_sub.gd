@@ -156,24 +156,24 @@ func setup_subscriptions(packet: Dictionary) -> void:
 	keepalive_timer.start(keepalive_timeout_seconds)
 
 	request_sub('channel.chat.message', '1', {
-		'broadcaster_user_id': str(Yatc.singleton.user.id),
-		'user_id': str(Yatc.singleton.user.id),
+		'broadcaster_user_id': str(Yatc.broadcaster_channel.id),
+		'user_id': str(Yatc.user.id),
 	})
 
 	request_sub('channel.channel_points_custom_reward_redemption.add', '1', {
-		'broadcaster_user_id': str(Yatc.singleton.user.id),
+		'broadcaster_user_id': str(Yatc.broadcaster_channel.id),
 	})
 
 	request_sub('channel.ad_break.begin', '1', {
-		'broadcaster_user_id': str(Yatc.singleton.user.id),
+		'broadcaster_user_id': str(Yatc.broadcaster_channel.id),
 	})
 
 	request_sub('stream.online', '1', {
-		'broadcaster_user_id': str(Yatc.singleton.user.id),
+		'broadcaster_user_id': str(Yatc.broadcaster_channel.id),
 	})
 
 	request_sub('stream.offline', '1', {
-		'broadcaster_user_id': str(Yatc.singleton.user.id),
+		'broadcaster_user_id': str(Yatc.broadcaster_channel.id),
 	})
 
 func request_sub(type: String, version: String, condition: Dictionary) -> void:
@@ -183,8 +183,8 @@ func request_sub(type: String, version: String, condition: Dictionary) -> void:
 	http.request(
 		URL_TWITCH_SUBSCRIPTIONS,
 		[
-			'Authorization: Bearer %s' % Yatc.singleton.user.token,
-			'Client-Id: %s' % Yatc.singleton.client_id,
+			'Authorization: Bearer %s' % Yatc.user.token,
+			'Client-Id: %s' % Yatc.client_id,
 			'Content-Type: application/json'
 		],
 		HTTPClient.METHOD_POST,

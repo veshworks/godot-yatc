@@ -16,18 +16,6 @@ const custom_types = [
 ]
 
 
-@export var client_id: String
-@export var username: String
-@export var scope: Array[String] = [
-	'user:read:chat',
-	'user:write:chat',
-	'channel:read:redemptions',
-	'channel:read:ads',
-	'moderator:manage:announcements',
-	]
-@export var persist: bool = true
-
-
 func _enable_plugin() -> void:
 	for autoload in autoload_singletons:
 		add_autoload_singleton.call(autoload[0], autoload[1])
@@ -35,13 +23,7 @@ func _enable_plugin() -> void:
 	for custom_type in custom_types:
 		add_custom_type.callv(custom_type)
 
-	ProjectSettings.add_property_info({
-		"name": "yatc/client_id",
-		"type": TYPE_STRING,
-		"hint": PROPERTY_HINT_PLACEHOLDER_TEXT,
-		"hint_string": "t84x861v4hnvv3mxq7nui0u30r8w1p"
-	})
-
+	YatcSettings.setup_settings()
 
 func _disable_plugin():
 	for autoload in autoload_singletons:

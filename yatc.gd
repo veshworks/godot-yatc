@@ -1,16 +1,14 @@
 extends Node
 # class_name Yatc
 
-@export var client_id: String
-@export var username: String
-@export var scope: Array[String] = [
-	'user:read:chat',
-	'user:write:chat',
-	'channel:read:redemptions',
-	'channel:read:ads',
-	'moderator:manage:announcements',
-	]
-@export var persist: bool = true
+const BASEPATH = 'user://yatc'
+
+var client_id: String:
+	get():
+		return YatcSettings.get_config('client_id')
+var scope: Array[String]:
+	get():
+		return YatcSettings.get_config('scope')
 
 signal signed_in(channel: YatcChannel)
 signal signed_out()
@@ -19,6 +17,9 @@ signal chat_message_received(message: YatcChatMessage)
 signal channel_points_reward_redeemed(reward: YatcPointsRedeemedReward)
 signal ad_break_begin(ad: YatcAdBreak)
 signal stream_status(is_online: bool)
+
+var username: String
+var broadcaster: String
 
 var timer_revalidation: Timer
 
@@ -30,23 +31,19 @@ var user: YatcChannel:
 			signed_in.emit(user)
 		else:
 			signed_out.emit()
+
+var broadcaster_channel: YatcChannel
+
 var api: YatcAPI
 var event_sub: YatcEventSub
 var polling: YatcPolling
 
-var logger: Logger = Logger.scope('Yatc')
+const YATC:= 'Yatc'
 
-enum Status {
-	signed_off,
-	local_token_retrieved,
-	local_token_invalidated,
-	awaiting_user_authorization,
-	token_acquired,
-	error,
-	ok,
-}
+var logger: Logger = Logger.scope(YATC)
 
-var status: Status = Status.signed_off
+var status:= StatusReporter.new()
+
 
 func _ready() -> void:
 	signed_in.connect(_on_sign_in)
@@ -67,22 +64,24 @@ func _ready() -> void:
 
 func load_token() -> void:
 	var loaded: YatcChannel = YatcChannel.load(username)
-	status = Status.local_token_retrieved
+	status.report(YATC, 'local_token_retrieved')
 
 	if not Set.new(loaded.scope).has_all(scope):
-		status = Status.local_token_invalidated
+		status.report(YATC, 'local_token_invalidated')
 		return
 
 	var is_valid = await validate_user(loaded.token)
-	status = Status.ok if is_valid else Status.local_token_invalidated
+	status.report(YATC, 'ok' if is_valid else 'local_token_invalidated')
 
 
-func sign_in() -> void:
+func sign_in(username: String, broadcaster: String) -> void:
+	self.username = username
+	self.broadcaster = broadcaster
 	await load_token()
-	if status == Status.ok:
+	if status.get_status(YATC) == 'ok':
 		return
 
-	status = Status.awaiting_user_authorization
+	status.report(YATC, 'awaiting_user_authorization')
 
 	var server = YatcAuthServer.new()
 	self.add_child(server)
@@ -92,9 +91,9 @@ func sign_in() -> void:
 	server.token_received.connect(func(_token):
 		var valid = await validate_user(_token)
 		if valid:
-			status = Status.ok
+			status.report(YATC, 'ok')
 		else:
-			status = Status.error
+			status.report(YATC, 'error')
 		self.remove_child(server)
 		server.queue_free()
 	)
@@ -102,11 +101,7 @@ func sign_in() -> void:
 
 func sign_out() -> void:
 	user = YatcChannel.new()
-	status = Status.signed_off
-
-
-func get_status() -> String:
-	return Status.find_key(status)
+	status.report(YATC, 'signed_off')
 
 
 func is_signed_in() -> bool:
@@ -118,9 +113,14 @@ func validate_user(tkn: String) -> bool:
 	var _user = await api.validate(token)
 	if not _user.is_valid(): return false
 
-	if persist:
-		_user.scope = scope
-		_user.save()
+	var query = await api.get_users([broadcaster])
+	if query.size() > 0:
+		broadcaster_channel = query.front()
+		broadcaster_channel.download_profile_image(self)
+
+	_user.scope = scope
+	_user.save()
+
 	self.user = _user
 	return true
 
@@ -138,21 +138,38 @@ func _on_sign_in(_user: YatcChannel) -> void:
 	event_sub.subscription_revoked.connect(sign_out)
 	self.add_child(event_sub)
 
-	(func(): user.custom_rewards = await api.get_custom_reward()).call()
-	(func(): user.manageable_rewards = await api.get_custom_reward(true)).call()
+	if scope_allows(['channel:read:redemptions', 'channel:manage:redemptions']):
+		_status_report_async('custom_rewards', func(): user.custom_rewards = await api.get_custom_reward())
+		_status_report_async('manageable_rewards', func(): user.manageable_rewards = await api.get_custom_reward(true))
 
-	var refresh_ad_schedule = func():
-		logger.info('ad_schedule refreshing')
-		user.ad_schedule = await api.get_ad_schedule()
-		logger.info('ad_schedule refreshed')
-	refresh_ad_schedule.call()
-	polling.add_callback(refresh_ad_schedule)
+	var refresh_ad_schedule = _status_report_async.bind(
+		'ad_schedule',
+		func(): user.ad_schedule = await api.get_ad_schedule(),
+		)
+
+	if scope_allows(['channel:read:ads']):
+		refresh_ad_schedule.call()
+		polling.add_callback(refresh_ad_schedule)
+
+
+func _status_report_async(sub_id: String, async_callback: Callable) -> void:
+	logger.info('%s loading' % sub_id)
+	status.report('%s.%s' % [YATC, sub_id], 'loading')
+	await async_callback.call()
+	logger.info('%s loaded' % sub_id)
+	status.report('%s.%s' % [YATC, sub_id], 'ok')
 
 
 func _on_sign_out() -> void:
 	self.remove_child(event_sub)
+	polling.clear_callbacks()
 	event_sub.queue_free()
 	event_sub = null
+
+
+func scope_allows(required_scopes_or: Array) -> bool:
+	return required_scopes_or.any(func(required_scope: String) -> bool:
+		return scope.has(required_scope))
 
 
 func get_module_path() -> String:
