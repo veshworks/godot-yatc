@@ -5,10 +5,10 @@ const BASEPATH = 'user://yatc'
 
 var client_id: String:
 	get():
-		return YatcSettings.get_config('client_id')
+		return YatcSettings.client_id
 var scope: Array[String]:
 	get():
-		return YatcSettings.get_config('scope')
+		return YatcSettings.scope
 
 signal signed_in(channel: YatcChannel)
 signal signed_out()
