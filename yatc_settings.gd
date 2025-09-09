@@ -8,6 +8,7 @@ const SCOPE_DEFAULT: Array[String] = [
 	'user:write:chat',
 	'channel:read:redemptions',
 	'channel:read:ads',
+	'channel:manage:redemptions',
 	'moderator:manage:announcements',
 	]
 

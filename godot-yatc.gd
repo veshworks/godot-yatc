@@ -31,3 +31,7 @@ func _disable_plugin():
 
 	for custom_type in custom_types:
 		remove_custom_type(custom_type[0])
+
+
+func _enter_tree() -> void:
+	YatcSettings.setup_settings()
