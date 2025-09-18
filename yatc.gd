@@ -99,6 +99,10 @@ func sign_in(username: String, broadcaster: String) -> void:
 	)
 
 
+func is_ready() -> bool:
+	return status.get_status(YATC) == 'ok'
+
+
 func sign_out() -> void:
 	user = YatcChannel.new()
 	status.report(YATC, 'signed_off')
