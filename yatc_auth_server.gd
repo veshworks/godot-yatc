@@ -98,8 +98,41 @@ func send200(client: StreamPeer, data: String = ''):
 
 
 func get_login_page() -> String:
-	var path = Yatc.get_module_path().path_join('public/index.html')
-	var file = FileAccess.open(path, FileAccess.READ)
-	var content = file.get_as_text()
-	file.close()
-	return content
+	return """
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv='cache-control' content='no-cache'>
+  <meta http-equiv='expires' content='0'>
+  <meta http-equiv='pragma' content='no-cache'>
+
+  <style>
+  * { background-color: #333; color: #aaa; }
+  </style>
+</head>
+<body>
+
+<h1 id="title">Login...</h1>
+
+<script>
+  (async () => {
+    const AUTH_URL = 'http://localhost:7777';
+    const query = location.hash.replace(/^#/, '').split('&').reduce((obj, pair) => {
+      var [key, value] = pair.split('=');
+      obj[key] = value;
+      return obj;
+    }, {});
+    const token = query.access_token;
+    fetch(AUTH_URL + `?token=${token}`, { method: 'POST' })
+      .then((e) => {
+        document.getElementById("title").innerHTML = "Everything seems to be OK. You can close this window.";
+      })
+      .catch((error) => {
+        document.getElementById("title").innerHTML = "ERROR: " + JSON.stringify(error);
+      });
+  })();
+</script>
+
+</body>
+</html>
+""".strip_edges()
